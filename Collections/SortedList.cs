@@ -4,45 +4,71 @@ namespace Collections
 {
     public class SortedList<E> : IEnumerable<E> where E : IComparable<E>
     {
-        private static readonly Comparer<E> AscendingComparer =
-            Comparer<E>.Create((x, y) => x.CompareTo(y));
+        private Comparer<E> Comparer;
+        protected List<E> Elements;
 
-        protected List<E> elements;
-        private readonly Comparer<E> comparer;
 
         public SortedList()
         {
-            elements = new List<E>();
-            comparer = AscendingComparer;
+            Elements = new List<E>();
+            InitiateComparer(null);
+        }
+
+        public SortedList(int capacity)
+        {
+            Elements = new List<E>(capacity);
+            InitiateComparer(null);
         }
 
         public SortedList(Comparer<E> comparer)
         {
-            elements = new List<E>();
-            this.comparer = comparer;
+            Elements = new List<E>();
+            InitiateComparer(comparer);
         }
+
+        public SortedList(Comparer<E> comparer, int capacity)
+        {
+            Elements = new List<E>(capacity);
+            InitiateComparer(comparer);
+        }
+
 
         public void Add(E element)
-        {
-            int index = FindIndex(element, 0, elements.Count);
-            elements.Insert(index, element);
+        { 
+            int index = FindIndexOfElement(element);
+            Elements.Insert(index, element);
         }
 
-        public E? Peek()
+        public E? PeekFirst()
         {
-            if (!elements.Any())
-                return default;
+            if (!Elements.Any()) return default;
 
-            return elements[Count() - 1];
+            return Elements[0];
+        }
+
+        public E? PeekLast()
+        {
+            if (!Elements.Any()) return default;
+
+            return Elements[Count() - 1];
+        }
+
+        public E RemoveFirst()
+        {
+            IsCollectionEmptyCheckAndThrow();
+
+            E element = Elements[0];
+            Elements.RemoveAt(0);
+
+            return element;
         }
 
         public E RemoveLast()
         {
-            if (!elements.Any())
-                throw new InvalidOperationException("Remove element on empty collection");
+            IsCollectionEmptyCheckAndThrow();
 
-            E element = elements[Count() - 1];
-            elements.RemoveAt(Count() - 1);
+            E element = Elements[Count() - 1];
+            Elements.RemoveAt(Count() - 1);
 
             return element;
         }
@@ -53,69 +79,104 @@ namespace Collections
             // If element's value same for more than one element in the list
             // Should get the whole list of same elements and remove the correct element
 
-            int index = FindIndex(element, 0, elements.Count);
+            if (!Elements.Any()) return false;
 
-            if (!elements.Any() || index >= elements.Count)
-                return false;
+            int index = FindIndexOfElement(element);
 
-            E foundElement = elements[index];
+            if (index >= Elements.Count) return false;
 
-            if (!foundElement.Equals(element))
-                return false;
+            E foundElement = Elements[index];
 
-            elements.RemoveAt(index);
+            if (!foundElement.Equals(element)) return false;
+
+            Elements.RemoveAt(index);
 
             return true;
         }
 
         public int Count()
         {
-            return elements.Count;
+            return Elements.Count;
         }
 
         public bool Any()
         {
-            return elements.Any();
+            return Elements.Any();
         }
 
         public void Clear()
         {
-            elements = new List<E>();
+            Elements.Clear();
         }
 
         public bool Contains(E element)
         {
-            return elements.Contains(element);
+            return Elements.Contains(element);
+        }
+
+        public void CopyTo(int index, E[] array)
+        {
+            for (int i = 0; i < Elements.Count; i++)
+            {
+                array[index + i] = Elements[i];
+            }
         }
 
         public void CopyTo(int index, E[] array, E element)
         {
-            int foundIndex = FindIndex(element, 0, elements.Count);
+            int foundIndex = FindIndexOfElement(element);
             for (int i = 0; i < foundIndex; i++)
             {
-                array[index + i] = elements[i];
+                array[index + i] = Elements[i];
             }
         }
 
-        public IList<E> LowerElementsToList(E element)
+        public E[] GetAllBefore(E element)
         {
-            IList<E> list = new List<E>();
+            if (!Elements.Any()) return Array.Empty<E>();
 
-            int foundIndex = FindIndex(element, 0, elements.Count);
+            int foundIndex = FindIndexOfElement(element);
 
-            for (int i = 0; i < foundIndex; i++) list.Add(elements[i]);
+            E[] array = new E[foundIndex];
 
-            return list;
+            for (int i = 0; i < foundIndex; i++)
+            {
+                array[i] = Elements[i];
+            }
+
+            return array;
+        }
+
+        public E[] GetAllAfter(E element)
+        {
+            if (!Elements.Any()) return Array.Empty<E>();
+
+            int foundIndex = FindIndexOfElement(element);
+            int length = Elements.Count - foundIndex;
+
+            E[] array = new E[length];
+
+            for (int i = foundIndex; i < Elements.Count; i++)
+            {
+                array[Elements.Count - i - 1] = Elements[i];
+            }
+
+            return array;
         }
 
         public IEnumerator<E> GetEnumerator()
         {
-            return elements.GetEnumerator();
+            return Elements.GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return elements.GetEnumerator();
+            return Elements.GetEnumerator();
+        }
+
+        private int FindIndexOfElement(E element)
+        {
+            return FindIndex(element, 0, Elements.Count);
         }
 
         private int FindIndex(E element, int start, int end)
@@ -126,36 +187,52 @@ namespace Collections
 
             if (half == 0)
             {
-                if (elements.Any())
+                if (Elements.Any())
                 {
-                    E startElement = elements[start];
-                    //if (startElement.CompareTo(element) >= 0)
-                    if (comparer.Compare(startElement, element) >= 0)
+                    if (Comparer.Compare(Elements[start], element) >= 0)
+                    {
                         return start;
+                    }  
                 }
 
                 return end;
             }
 
             int midIndex = start + half;
-            E midElement = elements[midIndex];
-            if (comparer.Compare(element, midElement) > 0)
+            E midElement = Elements[midIndex];
+            if (Comparer.Compare(element, midElement) > 0)
             {
-                // element is greater
+                // # element is greater
                 start = midIndex;
                 return FindIndex(element, start, end);
             }
-            else if (comparer.Compare(element, midElement) < 0)
+            else if (Comparer.Compare(element, midElement) < 0)
             {
-                // element is less
+                // # element is lower
                 end = midIndex;
                 return FindIndex(element, start, end);
             }
             else
             {
-                // element is equal
+                // # element is equal
                 return midIndex;
             }
+        }
+
+        private void IsCollectionEmptyCheckAndThrow()
+        {
+            if (!Elements.Any())
+            {
+                string excMsg = "Remove element on empty collection";
+                throw new EmptyCollectionException(excMsg);
+            }
+        }
+
+        private void InitiateComparer(Comparer<E>? comparer)
+        {
+            Comparer<E> AscendingComparer = Comparer<E>.Create((a, b) => a.CompareTo(b));
+            if (comparer == null) comparer = AscendingComparer;
+            Comparer = comparer;
         }
 
 

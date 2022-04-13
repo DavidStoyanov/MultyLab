@@ -32,7 +32,7 @@ namespace SchedulerResource
                         continue;
                     }
 
-                    double diff =  _sorted.Peek().End.Subtract(DateTime.Now).TotalMilliseconds;
+                    double diff =  _sorted.PeekLast().End.Subtract(DateTime.Now).TotalMilliseconds;
                     if (diff > 0)
                     {
                         Task.Delay((int)diff);
