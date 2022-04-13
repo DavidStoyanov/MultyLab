@@ -3,6 +3,7 @@ using System.Collections;
 using System.Text;
 using System.Linq;
 using System.Collections.Generic;
+using System;
 
 namespace Collections.Tests
 {
@@ -34,6 +35,23 @@ namespace Collections.Tests
         }
     }
 
+    public class Person : IComparable<Person>
+    {
+        public string Name { get; set; }
+        public double Weight { get; set; }
+
+        public Person(string name, double weight)
+        {
+            Name = name;
+            Weight = weight;
+        }
+
+        public int CompareTo(Person? other)
+        {
+            return this.Weight.CompareTo(other.Weight);
+        }
+    }
+
     public class SortedIntListBase : BaseSortedList
     {
         protected static readonly Comparer<int> AscendingComparer =
@@ -43,6 +61,12 @@ namespace Collections.Tests
 
         protected SortedList<int> list;
     }
+
+    public class SortedPersonListBase : BaseSortedList
+    {
+        protected SortedList<Person> list;
+    }
+
 
 
     public class SortedIntListAscendingAddTests : SortedIntListBase
@@ -652,5 +676,129 @@ namespace Collections.Tests
             CollectionAssert.AreEqual(expected, actual, Message(expected, actual));
         }
 
+    }
+
+    public class SortedPersonListTests : SortedPersonListBase
+    {
+        [SetUp]
+        protected void Setup()
+        {
+            list = new SortedList<Person>();
+        }
+
+        [Test]
+        public void TestContains()
+        {
+            var a = new Person("A", 50.5);
+            var b = new Person("B", -60.9);
+            var c = new Person("C", 0);
+            var d = new Person("D", 60.9);
+            var e = new Person("E", 60.9);
+            var f = new Person("F", 0.1);
+            var g = new Person("G", 55);
+            var h = new Person("H", 60.9);
+            var i = new Person("I", -23);
+            var j = new Person("J", 101);
+
+            list.Add(a);
+            list.Add(b);
+            list.Add(c);
+            list.Add(d);
+            list.Add(e);
+            list.Add(f);
+            list.Add(g);
+            list.Add(h);
+            list.Add(i);
+            list.Add(j);
+
+            bool contains = list.Contains(e);
+
+            Assert.IsTrue(contains);
+        }
+
+        [Test]
+        public void TestRemove1()
+        {
+            var a = new Person("A", 50.5);
+            var b = new Person("B", -60.9);
+            var c = new Person("C", 0);
+            var d = new Person("D", 60.9);
+            var e = new Person("E", 60.9);
+            var f = new Person("F", 0.1);
+            var g = new Person("G", 55);
+            var h = new Person("H", 60.9);
+            var i = new Person("I", -23);
+            var j = new Person("J", 101);
+
+            list.Add(a);
+            list.Add(b);
+            list.Add(c);
+            list.Add(d);
+            list.Add(e);
+            list.Add(f);
+            list.Add(g);
+            list.Add(h);
+            list.Add(i);
+            list.Add(j);
+
+            list.Remove(e);
+
+            bool contains = list.Contains(e);
+
+            Assert.IsFalse(contains);
+        }
+
+        [Test]
+        public void TestRemove2()
+        {
+            var a = new Person("A", 50.5);
+            var b = new Person("B", -60.9);
+            var c = new Person("C", 0);
+            var d = new Person("D", 60.9);
+            var d2 = new Person("D2", 60.9);
+            var d3 = new Person("D3", 60.9);
+            var e = new Person("E", 60.9);
+            var e2 = new Person("E2", 60.9);
+            var f = new Person("F", 0.1);
+            var g = new Person("G", 55);
+            var h = new Person("H", 60.9);
+            var i = new Person("I", -23);
+            var j = new Person("J", 101);
+
+            list.Add(d3);
+            list.Add(a);
+            list.Add(b);
+            list.Add(c);
+            list.Add(d);
+            list.Add(e);
+            list.Add(f);
+            list.Add(g);
+            list.Add(h);
+            list.Add(i);
+            list.Add(j);
+            list.Add(d2);
+            list.Add(e2);
+
+            list.Remove(e);
+
+            bool contains = list.Contains(e);
+
+            Assert.IsFalse(contains);
+        }
+
+        [Test]
+        public void TestRemove3()
+        {
+            var a = new Person("A", 50.5);
+            var b = new Person("B", -60.9);
+            var c = new Person("C", 0);
+
+            list.Add(a);
+            list.Add(b);
+
+            bool removed = list.Remove(c);
+
+            Assert.IsFalse(removed);
+        }
     }
 }

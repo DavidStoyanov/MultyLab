@@ -75,15 +75,15 @@ namespace Collections
 
         public bool Remove(E element)
         {
-            // ?? WARNING TODO...
-            // If element's value same for more than one element in the list
-            // Should get the whole list of same elements and remove the correct element
-
             if (!Elements.Any()) return false;
 
+            // find the index of first element with same value
             int index = FindIndexOfElement(element);
 
             if (index >= Elements.Count) return false;
+
+            // find the exact same element index
+            index = FindIndexElementByNearIndex(element, index);
 
             E foundElement = Elements[index];
 
@@ -93,6 +93,28 @@ namespace Collections
 
             return true;
         }
+
+        private int FindIndexElementByNearIndex(E element, int index)
+        {
+            int indexInner = index + 1;
+            while (indexInner >= 0)
+            {
+                indexInner--;
+                E foundElement = Elements[indexInner];
+                if (foundElement.Equals(element)) return indexInner;
+                if (foundElement.CompareTo(element) != 0) break;
+            }
+            indexInner = index;
+            while (indexInner < Elements.Count - 1)
+            {
+                indexInner++;
+                E foundElement = Elements[indexInner];
+                if (foundElement.Equals(element)) return indexInner;
+                if (foundElement.CompareTo(element) != 0) break;
+            }
+            return index;
+        }
+
 
         public int Count()
         {
