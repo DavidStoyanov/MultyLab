@@ -1,145 +1,229 @@
 ﻿using Collections;
-using Scheduler;
 
-namespace SchedulerResource
+namespace Scheduler
 {
-    public class SchedulerTimers : IDisposable
+    public class TimeScheduler
     {
-        private static readonly Comparer<PrivateTimer> DescendingComparer =
-            Comparer<PrivateTimer>.Create((x, y) => y.CompareTo(x));
+        private static readonly Comparer<SideTimer> DescendingComparer =
+            Comparer<SideTimer>.Create((x, y) => y.CompareTo(x));
 
-        private readonly Dictionary<SchedulerTimer, PrivateTimer> _timers = new();
-        private readonly SortedList<PrivateTimer> _sorted = new SortedList<PrivateTimer>(DescendingComparer);
+        private readonly SortedList<SideTimer> _timers = new SortedList<SideTimer>(DescendingComparer);
 
-        public bool Running { get; private set; }
+        private CancellationTokenSource _waiterSource = new CancellationTokenSource();
 
-        public SchedulerTimers()
+        private Task? _process;
+        private bool _enabled;
+
+        public bool Enabled
         {
-            Running = true;
-            Start();
+            get => _enabled;
+            set => SetEnable(value);
         }
 
-        private void Start()
-        {
-            Task.Run(() =>
-            {
-                while (Running == true)
-                {
-                    if (!_sorted.Any())
-                    {
-                        // todo: better checks
-                        Task.Delay(1000);
-                        continue;
-                    }
 
-                    double diff =  _sorted.PeekLast().End.Subtract(DateTime.Now).TotalMilliseconds;
-                    if (diff > 0)
-                    {
-                        Task.Delay((int)diff);
-                    }
-                    else
-                    {
-                        // todo: remove from _timers
-                        PrivateTimer timer = _sorted.RemoveLast();
-                        timer.Action();
-                    }
-                }
-            });
+        public TimeScheduler() : this(true) { }
+
+        public TimeScheduler(bool enabled)
+        {
+            Init(enabled);
         }
 
-        public bool Add(SchedulerTimer timer)
-        {
-            if (_timers.ContainsKey(timer))
-                return false;
 
-            if (DateTime.Now > timer.EndDateTime)
+        public bool Add(SideTimer timer)
+        {
+            if (DateTime.Now > timer.End)
             {
                 timer.Action();
                 return false;
             }
 
-            PrivateTimer privateTimer = new(timer.Action, timer.EndDateTime);
-            
-            _timers.Add(timer, privateTimer);
-            _sorted.Add(privateTimer);
+            lock (_timers)
+            {
+                _timers.Add(timer);
+            }
+
+            RestartProcess();
 
             return true;
         }
 
-        public bool Remove(SchedulerTimer timer)
+        public bool Remove(SideTimer timer)
         {
-            bool isTimerPresent = _timers
-                .TryGetValue(timer, out PrivateTimer privateTimer);
-
-            if (!isTimerPresent)
-                return false;
-
-            _timers.Remove(timer);
-
-            return _sorted.Remove(privateTimer);
+            lock (_timers)
+            {
+                return _timers.Remove(timer);
+            }
         }
 
-        public void Dispose()
+        private void StartProcessing()
         {
-            Running = false;
+            _process = Task.Run(() =>
+            {
+                while (_enabled)
+                {
+                    if (!_timers.Any()) break;
+
+                    int diff = GetDifference();
+
+                    if (diff >= 1)
+                    {
+                        _waiterSource.Token.WaitHandle.WaitOne(diff);
+                        ResetWaiterSourceIfWasRequested();
+                    }
+                    else
+                    {
+                        SideTimer timer = RemoveLastTimer();
+                        timer.Action.Invoke();
+                    }
+                }
+
+            });
         }
 
-        private class PrivateTimer : IComparable<PrivateTimer>
+        private int GetDifference()
         {
-            public PrivateTimer(Action action, DateTime end)
+            lock (_timers)
             {
-                Action = action;
-                End = end;
+                SideTimer timer = _timers.Last();
+                return (int)timer.End.Subtract(DateTime.Now).TotalMilliseconds;
             }
+        }
 
-            public Action Action { get; init; }
-            public DateTime End { get; init; }
-
-
-            public int CompareTo(PrivateTimer? other)
+        private SideTimer RemoveLastTimer()
+        {
+            lock (_timers)
             {
-                if (other == null)
-                    throw new InvalidTimerStateException("Can not compare to null");
-
-                return this.End.CompareTo(other.End);
+                return _timers.RemoveLast();
             }
+        }
+
+        private void ResetWaiterSourceIfWasRequested()
+        {
+            if (!_waiterSource.IsCancellationRequested) return;
+            _waiterSource.Dispose();
+            _waiterSource = new CancellationTokenSource();
+        }
+
+        private void RestartProcess()
+        {
+            if (!_enabled) return;
+            if (!_process.IsCompleted) return;
+
+            _waiterSource.Cancel();
+            _process.Dispose();
+
+            StartProcessing();
+        }
+
+        private void Init(bool enabled)
+        {
+            _enabled = enabled;
+            _waiterSource = new CancellationTokenSource();
+
+            if (_enabled)
+            {
+                StartProcessing();
+            }
+            else
+            {
+                _process = Task.CompletedTask;
+            }
+        }
+
+        private void SetEnable(bool value)
+        {
+            _enabled = value;
+            if (_enabled) RestartProcess();
         }
 
 
     }
 
-    public class SchedulerTimer
+
+    public class SideTimer : IComparable<SideTimer>
     {
         public Action Action { get; set; }
-        public int? Timeout { get; init; }
-        public DateTime? End { get; init; }
+        public DateTime End { get; init; }
 
-        public DateTime EndDateTime => CalculateEndDateTime();
+        public SideTimer()
+        {
+        }
 
-        public SchedulerTimer() { }
-
-        public SchedulerTimer(Action action, int timeout)
+        public SideTimer(Action action, DateTime end)
         {
             Action = action;
-            Timeout = timeout;
+            End = end;
         }
 
-        public SchedulerTimer(Action action, DateTime endDateTime)
+        public int CompareTo(SideTimer? other)
         {
-            Action = action;
-            End = endDateTime;
+            return this.End.CompareTo(other.End);
         }
-
-        private DateTime CalculateEndDateTime()
-        {
-            if (End != null)
-                return (DateTime)End;
-
-            if (Timeout != null)
-                return DateTime.Now.AddMilliseconds((int)Timeout);
-
-            throw new InvalidTimerStateException("Timer fields not set");
-        }
-
     }
+
+
+    public sealed class SideTimerBuilder
+    {
+        private Action? _action;
+        private int? _timeout;
+        private DateTime? _end;
+
+        private SideTimerBuilder() { }
+
+        public static SideTimerBuilder Build()
+        {
+            return new SideTimerBuilder();
+        }
+
+
+        public SideTimerBuilder Action(Action action)
+        {
+            _action = action;
+            return this;
+        }
+
+        public SideTimerBuilder Timeout(int timeout)
+        {
+            _timeout = timeout;
+            return this;
+        }
+
+        public SideTimerBuilder EndDateTime(DateTime end)
+        {
+            _end = end;
+            return this;
+        }
+
+        public SideTimer AddToScheduler(TimeScheduler scheduler)
+        {
+            SideTimer timer = BuildTimer();
+            scheduler.Add(timer);
+            return timer;
+        }
+
+        public SideTimer ToTimer()
+        {
+            return BuildTimer();
+        }
+
+        private SideTimer BuildTimer()
+        {
+            if (_action == null)
+                throw new Exception("Timer build exception: missing action");
+
+            return new SideTimer(_action, ExtractEndDateTime());
+        }
+
+        private DateTime ExtractEndDateTime()
+        {
+            if (_end != null)
+                return (DateTime)_end;
+
+            if (_timeout != null)
+                return DateTime.Now.AddMilliseconds((int)_timeout);
+
+            throw new Exception("Should initiate atleast End or Timeout");
+        }
+    }
+
 }

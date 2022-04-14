@@ -115,7 +115,6 @@ namespace Collections
             return index;
         }
 
-
         public int Count()
         {
             return Elements.Count;

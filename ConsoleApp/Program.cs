@@ -1,39 +1,15 @@
-﻿using SchedulerResource;
+﻿using System;
 
-SchedulerTimers scheduler = new SchedulerTimers();
-Random random = new Random();
-
-int counter = 0;
-
-for (int i = 0; i < 500; i++)
+namespace ConsoleApp
 {
-    SchedulerTimer timer = new SchedulerTimer()
+    public class Program
     {
-        Action = () => PrintDateTimeNow(),
-        Timeout = random.Next(10000)
-    };
+        static void Main(string[] args)
+        {
+            var scheduler = new SchedulerDemo();
+            scheduler.TestWithSchedulerTausendTimers(10);
 
-    SchedulerTimer timer2 = new SchedulerTimer()
-    {
-        Action = () => PrintDateTimeNow2(),
-        Timeout = random.Next(10000)
-    };
-
-    scheduler.Add(timer);
-    scheduler.Add(timer2);
+            Console.ReadKey();
+        }
+    }
 }
-
-
-void PrintDateTimeNow()
-{
-    Console.WriteLine($"{DateTime.Now} - {++counter}");
-    Console.WriteLine("===============");
-}
-
-void PrintDateTimeNow2()
-{
-    Console.WriteLine($"{DateTime.Now} - {++counter}");
-    Console.WriteLine("===============");
-}
-
-Console.ReadKey();
