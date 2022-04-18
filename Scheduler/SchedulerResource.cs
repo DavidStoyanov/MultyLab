@@ -55,6 +55,32 @@ namespace Scheduler
             }
         }
 
+        public IList<SideTimer> RemoveAll()
+        {
+            return RemoveAll(false);
+        }
+
+        public IList<SideTimer> RemoveAll(bool evaluate)
+        {
+            IList<SideTimer> timers = new List<SideTimer>();
+
+            lock (_timers)
+            {
+                foreach (var timer in _timers)
+                    timers.Add(timer);
+
+                _timers.Clear();
+            }
+
+            if (evaluate)
+            {
+                foreach (var timer in _timers)
+                    timer.Action.Invoke();
+            }
+
+            return timers;
+        }
+
         private void StartProcessing()
         {
             _process = Task.Run(() =>
