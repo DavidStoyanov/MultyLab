@@ -133,12 +133,14 @@ namespace Scheduler
         private void RestartProcess()
         {
             if (!_enabled) return;
-            if (!_process.IsCompleted) return;
 
             _waiterSource.Cancel();
-            _process.Dispose();
 
-            StartProcessing();
+            if (_process.IsCompleted)
+            {
+                _process.Dispose();
+                StartProcessing();
+            }
         }
 
         private void Init(bool enabled)
@@ -187,51 +189,69 @@ namespace Scheduler
         }
     }
 
-
-    public sealed class SideTimerBuilder
+    public class ASD
     {
-        private Action? _action;
-        private int? _timeout;
-        private DateTime? _end;
+        public static void Main()
+        {
+            TimeScheduler scheduler = new TimeScheduler();
+            var x = SideTimerBuilder.Build().Action(() => { }).Timeout(3000).AddToScheduler(scheduler);
+        }
+    }
+
+
+    public class SideTimerBuilder
+    {
+        protected Action? _action;
+        protected int? _timeout;
+        protected DateTime? _end;
 
         private SideTimerBuilder() { }
 
-        public static SideTimerBuilder Build()
+        public static BuilderTimer Build()
         {
-            return new SideTimerBuilder();
+            return new BuilderTimer();
         }
 
-
-        public SideTimerBuilder Action(Action action)
+        public class BuilderTimer : SideTimerBuilder
         {
-            _action = action;
-            return this;
+            public BuilderAction Action(Action action)
+            {
+                _action = action;
+                return (BuilderAction)this;
+            }
         }
 
-        public SideTimerBuilder Timeout(int timeout)
+        public class BuilderAction : BuilderTimer
         {
-            _timeout = timeout;
-            return this;
+            public BuilderTime Timeout(int timeout)
+            {
+                _timeout = timeout;
+                return (BuilderTime)this;
+            }
+
+            public BuilderTime EndDateTime(DateTime end)
+            {
+                _end = end;
+                return (BuilderTime)this;
+            }
         }
 
-        public SideTimerBuilder EndDateTime(DateTime end)
+        public class BuilderTime : BuilderAction
         {
-            _end = end;
-            return this;
+            public SideTimer ToTimer()
+            {
+                return BuildTimer();
+            }
+
+            public SideTimer AddToScheduler(TimeScheduler scheduler)
+            {
+                SideTimer timer = BuildTimer();
+                scheduler.Add(timer);
+                return timer;
+            }
         }
 
-        public SideTimer AddToScheduler(TimeScheduler scheduler)
-        {
-            SideTimer timer = BuildTimer();
-            scheduler.Add(timer);
-            return timer;
-        }
-
-        public SideTimer ToTimer()
-        {
-            return BuildTimer();
-        }
-
+        
         private SideTimer BuildTimer()
         {
             if (_action == null)
