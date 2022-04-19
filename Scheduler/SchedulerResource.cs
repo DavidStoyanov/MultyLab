@@ -189,69 +189,67 @@ namespace Scheduler
         }
     }
 
-    public class ASD
+
+    public interface IActionBuilder
     {
-        public static void Main()
-        {
-            TimeScheduler scheduler = new TimeScheduler();
-            var x = SideTimerBuilder.Build().Action(() => { }).Timeout(3000).AddToScheduler(scheduler);
-        }
+        ITimeBuilder Action(Action action);
     }
 
-
-    public class SideTimerBuilder
+    public interface ITimeBuilder
     {
-        protected Action? _action;
-        protected int? _timeout;
-        protected DateTime? _end;
+        IFinalBuilder Timeout(int timeout);
+        IFinalBuilder EndDateTime(DateTime end);
+    }
+
+    public interface IFinalBuilder
+    {
+        SideTimer ToTimer();
+        SideTimer AddToScheduler(TimeScheduler scheduler);
+    }
+
+    public class SideTimerBuilder : IActionBuilder, ITimeBuilder, IFinalBuilder
+    {
+        private Action? _action;
+        private int? _timeout;
+        private DateTime? _end;
 
         private SideTimerBuilder() { }
 
-        public static BuilderTimer Build()
+        public static IActionBuilder Build()
         {
-            return new BuilderTimer();
+            return new SideTimerBuilder();
         }
 
-        public class BuilderTimer : SideTimerBuilder
+        public ITimeBuilder Action(Action action)
         {
-            public BuilderAction Action(Action action)
-            {
-                _action = action;
-                return (BuilderAction)this;
-            }
+            _action = action;
+            return this;
         }
 
-        public class BuilderAction : BuilderTimer
+        public IFinalBuilder Timeout(int timeout)
         {
-            public BuilderTime Timeout(int timeout)
-            {
-                _timeout = timeout;
-                return (BuilderTime)this;
-            }
-
-            public BuilderTime EndDateTime(DateTime end)
-            {
-                _end = end;
-                return (BuilderTime)this;
-            }
+            _timeout = timeout;
+            return this;
         }
 
-        public class BuilderTime : BuilderAction
+        public IFinalBuilder EndDateTime(DateTime end)
         {
-            public SideTimer ToTimer()
-            {
-                return BuildTimer();
-            }
-
-            public SideTimer AddToScheduler(TimeScheduler scheduler)
-            {
-                SideTimer timer = BuildTimer();
-                scheduler.Add(timer);
-                return timer;
-            }
+            _end = end;
+            return this;
         }
 
-        
+        public SideTimer ToTimer()
+        {
+            return BuildTimer();
+        }
+
+        public SideTimer AddToScheduler(TimeScheduler scheduler)
+        {
+            SideTimer timer = BuildTimer();
+            scheduler.Add(timer);
+            return timer;
+        }
+
         private SideTimer BuildTimer()
         {
             if (_action == null)
